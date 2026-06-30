@@ -1,0 +1,37 @@
+{
+  "title": "示例题库",
+  "description": "演示选择题和填空题的基本格式。",
+  "questions": [
+    {
+      "id": "choice-1",
+      "type": "choice",
+      "prompt": "Python 中用于定义函数的关键字是什么？",
+      "options": ["func", "define", "def", "lambda"],
+      "answer": "C",
+      "explanation": "Python 使用 def 来定义普通函数。"
+    },
+    {
+      "id": "choice-2",
+      "type": "choice",
+      "prompt": "Git 中用于查看当前仓库状态的命令是什么？",
+      "options": ["git check", "git status", "git state", "git branch"],
+      "answer": "B",
+      "explanation": "git status 会展示当前分支、暂存区和工作区的状态。"
+    },
+    {
+      "id": "blank-1",
+      "type": "blank",
+      "prompt": "HTTP 默认端口是 ____ 。",
+      "answer": "80",
+      "explanation": "HTTP 的默认端口是 80，HTTPS 的默认端口是 443。"
+    },
+    {
+      "id": "blank-2",
+      "type": "blank",
+      "prompt": "Python 中表示布尔真值的关键字是 ____ 。",
+      "answer": "True",
+      "explanation": "Python 的布尔真值关键字是 True，首字母大写。"
+    }
+  ]
+}
+
