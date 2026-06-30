@@ -22,15 +22,27 @@
 <section class="section">
   <div class="section-head">
     <h2>开始练习</h2>
-    <p>按题型开启新的练习；如果该模式有未完成进度，会自动续上次的题。</p>
+    <p>可以选择顺序或打乱，也可以勾选重新开始进度。</p>
   </div>
   <div class="card-grid">
     {% for mode in ["choice", "blank", "all"] %}
-      <article class="panel compact-card">
+      <article class="panel compact-card practice-settings">
         <p class="card-kicker">{{ question_type_labels[mode] }}</p>
         <h3>{{ mode_counts[mode] }} 题可练</h3>
-        <form method="post" action="{{ url_for('start_bank', bank_id=bank_row['id']) }}">
+        <form method="post" action="{{ url_for('start_bank', bank_id=bank_row['id']) }}" class="stack-form practice-settings-form">
           <input type="hidden" name="mode" value="{{ mode }}">
+          <input type="hidden" name="source_kind" value="bank">
+          <label>
+            <span>做题顺序</span>
+            <select name="order_mode">
+              <option value="sequential">顺序做题</option>
+              <option value="shuffle" selected>打乱顺序</option>
+            </select>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" name="restart_progress">
+            <span>重新开始进度</span>
+          </label>
           <button class="primary-button" type="submit">进入 {{ question_type_labels[mode] }}</button>
         </form>
       </article>

@@ -18,6 +18,18 @@ QUESTION_TYPE_LABELS = {
     "all": "混合练习",
 }
 
+ORDER_MODE_LABELS = {
+    "sequential": "顺序做题",
+    "shuffle": "打乱顺序",
+}
+
+SOURCE_KIND_LABELS = {
+    "bank": "题库练习",
+    "wrong_book": "错题重做",
+}
+
+WRONG_BOOK_CLEAR_STREAK = 2
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -46,6 +58,8 @@ CREATE TABLE IF NOT EXISTS practice_sessions (
     user_id INTEGER NOT NULL,
     bank_id INTEGER NOT NULL,
     mode TEXT NOT NULL,
+    order_mode TEXT NOT NULL DEFAULT 'shuffle',
+    source_kind TEXT NOT NULL DEFAULT 'bank',
     question_order_json TEXT NOT NULL,
     current_index INTEGER NOT NULL DEFAULT 0,
     answered_count INTEGER NOT NULL DEFAULT 0,
@@ -70,6 +84,8 @@ CREATE TABLE IF NOT EXISTS wrong_questions (
     explanation TEXT NOT NULL,
     options_json TEXT,
     wrong_count INTEGER NOT NULL DEFAULT 1,
+    correct_streak INTEGER NOT NULL DEFAULT 0,
+    answer_history_json TEXT NOT NULL DEFAULT '[]',
     last_user_answer TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -92,6 +108,10 @@ def init_db(db_path: Path) -> None:
     ensure_data_dir(db_path.parent)
     with sqlite3.connect(db_path) as connection:
         connection.executescript(SCHEMA)
+        ensure_column(connection, "practice_sessions", "order_mode", "TEXT NOT NULL DEFAULT 'shuffle'")
+        ensure_column(connection, "practice_sessions", "source_kind", "TEXT NOT NULL DEFAULT 'bank'")
+        ensure_column(connection, "wrong_questions", "correct_streak", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(connection, "wrong_questions", "answer_history_json", "TEXT NOT NULL DEFAULT '[]'")
         connection.commit()
 
 
@@ -99,6 +119,20 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
     return connection
+
+
+def ensure_column(
+    connection: sqlite3.Connection,
+    table_name: str,
+    column_name: str,
+    definition: str,
+) -> None:
+    existing_columns = {
+        row[1] for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name in existing_columns:
+        return
+    connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
 
 def create_user(db_path: Path, username: str, password: str) -> tuple[bool, str]:
@@ -325,17 +359,18 @@ def get_active_session_for_mode(
     user_id: int,
     bank_id: int,
     mode: str,
+    source_kind: str = "bank",
 ) -> sqlite3.Row | None:
     with get_connection(db_path) as connection:
         return connection.execute(
             """
             SELECT *
             FROM practice_sessions
-            WHERE user_id = ? AND bank_id = ? AND mode = ? AND status = 'active'
+            WHERE user_id = ? AND bank_id = ? AND mode = ? AND source_kind = ? AND status = 'active'
             ORDER BY updated_at DESC, id DESC
             LIMIT 1
             """,
-            (user_id, bank_id, mode),
+            (user_id, bank_id, mode, source_kind),
         ).fetchone()
 
 
@@ -344,6 +379,8 @@ def create_session(
     user_id: int,
     bank_id: int,
     mode: str,
+    order_mode: str,
+    source_kind: str,
     question_ids: list[str],
 ) -> int:
     now = utc_now()
@@ -351,15 +388,35 @@ def create_session(
         connection.execute(
             """
             INSERT INTO practice_sessions (
-                user_id, bank_id, mode, question_order_json, created_at, updated_at
+                user_id, bank_id, mode, order_mode, source_kind, question_order_json, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, bank_id, mode, json.dumps(question_ids), now, now),
+            (user_id, bank_id, mode, order_mode, source_kind, json.dumps(question_ids), now, now),
         )
         session_id = int(connection.execute("SELECT last_insert_rowid()").fetchone()[0])
         connection.commit()
     return session_id
+
+
+def abandon_active_sessions(
+    db_path: Path,
+    user_id: int,
+    bank_id: int,
+    mode: str,
+    source_kind: str = "bank",
+) -> None:
+    now = utc_now()
+    with get_connection(db_path) as connection:
+        connection.execute(
+            """
+            UPDATE practice_sessions
+            SET status = 'abandoned', updated_at = ?
+            WHERE user_id = ? AND bank_id = ? AND mode = ? AND source_kind = ? AND status = 'active'
+            """,
+            (now, user_id, bank_id, mode, source_kind),
+        )
+        connection.commit()
 
 
 def get_session_for_user(db_path: Path, user_id: int, session_id: int) -> sqlite3.Row | None:
@@ -423,6 +480,25 @@ def record_answer(
         "total_questions": len(question_order),
     }
 
+    if session_row["source_kind"] == "wrong_book":
+        wrong_book_state = sync_wrong_book_progress(
+            db_path=db_path,
+            user_id=int(session_row["user_id"]),
+            bank_id=int(session_row["bank_id"]),
+            question=question,
+            user_answer=user_answer,
+            is_correct=is_correct,
+        )
+        feedback["wrong_book_state"] = wrong_book_state
+    elif not is_correct:
+        upsert_wrong_question(
+            db_path=db_path,
+            user_id=int(session_row["user_id"]),
+            bank_id=int(session_row["bank_id"]),
+            question=question,
+            user_answer=user_answer,
+        )
+
     with get_connection(db_path) as connection:
         connection.execute(
             """
@@ -443,15 +519,6 @@ def record_answer(
             ),
         )
         connection.commit()
-
-    if not is_correct:
-        upsert_wrong_question(
-            db_path=db_path,
-            user_id=int(session_row["user_id"]),
-            bank_id=int(session_row["bank_id"]),
-            question=question,
-            user_answer=user_answer,
-        )
 
 
 def clear_feedback_ack(db_path: Path, user_id: int, session_id: int) -> None:
@@ -480,30 +547,38 @@ def upsert_wrong_question(
     with get_connection(db_path) as connection:
         existing = connection.execute(
             """
-            SELECT id, wrong_count
+            SELECT id, wrong_count, answer_history_json
             FROM wrong_questions
             WHERE user_id = ? AND bank_id = ? AND question_id = ?
             """,
             (user_id, bank_id, question.id),
         ).fetchone()
         if existing:
+            history = json.loads(existing["answer_history_json"]) if existing["answer_history_json"] else []
+            history.append(False)
             connection.execute(
                 """
                 UPDATE wrong_questions
-                SET wrong_count = ?, last_user_answer = ?, updated_at = ?
+                SET wrong_count = ?, correct_streak = 0, answer_history_json = ?, last_user_answer = ?, updated_at = ?
                 WHERE id = ?
                 """,
-                (int(existing["wrong_count"]) + 1, user_answer, now, existing["id"]),
+                (
+                    int(existing["wrong_count"]) + 1,
+                    json.dumps(history[-12:], ensure_ascii=False),
+                    user_answer,
+                    now,
+                    existing["id"],
+                ),
             )
         else:
             connection.execute(
                 """
                 INSERT INTO wrong_questions (
                     user_id, bank_id, question_id, question_type, prompt, answer,
-                    explanation, options_json, wrong_count, last_user_answer,
+                    explanation, options_json, wrong_count, correct_streak, answer_history_json, last_user_answer,
                     updated_at, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -515,12 +590,98 @@ def upsert_wrong_question(
                     question.explanation,
                     options_json,
                     1,
+                    0,
+                    json.dumps([False], ensure_ascii=False),
                     user_answer,
                     now,
                     now,
                 ),
             )
         connection.commit()
+
+
+def sync_wrong_book_progress(
+    db_path: Path,
+    user_id: int,
+    bank_id: int,
+    question: Question,
+    user_answer: str,
+    is_correct: bool,
+) -> dict[str, Any]:
+    if not is_correct:
+        upsert_wrong_question(
+            db_path=db_path,
+            user_id=user_id,
+            bank_id=bank_id,
+            question=question,
+            user_answer=user_answer,
+        )
+        return {
+            "resolved": False,
+            "current_streak": 0,
+            "required_streak": WRONG_BOOK_CLEAR_STREAK,
+            "remaining": WRONG_BOOK_CLEAR_STREAK,
+        }
+
+    now = utc_now()
+    with get_connection(db_path) as connection:
+        existing = connection.execute(
+            """
+            SELECT id, correct_streak, answer_history_json
+            FROM wrong_questions
+            WHERE user_id = ? AND bank_id = ? AND question_id = ?
+            """,
+            (user_id, bank_id, question.id),
+        ).fetchone()
+        if not existing:
+            return {
+                "resolved": True,
+                "current_streak": WRONG_BOOK_CLEAR_STREAK,
+                "required_streak": WRONG_BOOK_CLEAR_STREAK,
+                "remaining": 0,
+            }
+
+        next_streak = int(existing["correct_streak"]) + 1
+        history = json.loads(existing["answer_history_json"]) if existing["answer_history_json"] else []
+        history.append(True)
+
+        if next_streak >= WRONG_BOOK_CLEAR_STREAK:
+            connection.execute(
+                """
+                DELETE FROM wrong_questions
+                WHERE id = ?
+                """,
+                (existing["id"],),
+            )
+            connection.commit()
+            return {
+                "resolved": True,
+                "current_streak": WRONG_BOOK_CLEAR_STREAK,
+                "required_streak": WRONG_BOOK_CLEAR_STREAK,
+                "remaining": 0,
+            }
+
+        connection.execute(
+            """
+            UPDATE wrong_questions
+            SET correct_streak = ?, answer_history_json = ?, last_user_answer = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                next_streak,
+                json.dumps(history[-12:], ensure_ascii=False),
+                user_answer,
+                now,
+                existing["id"],
+            ),
+        )
+        connection.commit()
+        return {
+            "resolved": False,
+            "current_streak": next_streak,
+            "required_streak": WRONG_BOOK_CLEAR_STREAK,
+            "remaining": WRONG_BOOK_CLEAR_STREAK - next_streak,
+        }
 
 
 def wrong_book_by_bank(db_path: Path, user_id: int) -> list[dict[str, Any]]:
@@ -559,12 +720,33 @@ def wrong_book_by_bank(db_path: Path, user_id: int) -> list[dict[str, Any]]:
                 "explanation": row["explanation"],
                 "options": json.loads(row["options_json"]) if row["options_json"] else None,
                 "wrong_count": int(row["wrong_count"]),
+                "correct_streak": int(row["correct_streak"]),
+                "answer_history": json.loads(row["answer_history_json"]) if row["answer_history_json"] else [],
                 "last_user_answer": row["last_user_answer"],
                 "updated_at": row["updated_at"],
             }
         )
 
     return list(grouped.values())
+
+
+def wrong_question_ids_for_bank(
+    db_path: Path,
+    user_id: int,
+    bank_id: int,
+    mode: str,
+) -> list[str]:
+    with get_connection(db_path) as connection:
+        rows = connection.execute(
+            """
+            SELECT question_id
+            FROM wrong_questions
+            WHERE user_id = ? AND bank_id = ? AND question_type = ?
+            ORDER BY updated_at DESC, id DESC
+            """,
+            (user_id, bank_id, mode),
+        ).fetchall()
+    return [row["question_id"] for row in rows]
 
 
 def active_sessions_for_user(db_path: Path, user_id: int) -> list[sqlite3.Row]:

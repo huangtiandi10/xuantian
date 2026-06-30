@@ -4,7 +4,7 @@
 <section class="section">
   <div class="section-head">
     <h1>错题集</h1>
-    <p>这里已经按题库分组，并在每个题库下按题型进行二次分类。</p>
+    <p>错题会按题库和题型分组；做对几次后会自动移除。</p>
   </div>
 
   {% if grouped %}
@@ -13,7 +13,15 @@
         <article class="panel wrong-bank-card">
           <div class="section-head">
             <h2>{{ bank.bank_title }}</h2>
-            <a class="ghost-button link-button" href="{{ url_for('bank_detail', bank_id=bank.bank_id) }}">返回题库</a>
+            <div class="inline-actions">
+              <form method="post" action="{{ url_for('start_bank', bank_id=bank.bank_id) }}">
+                <input type="hidden" name="mode" value="all">
+                <input type="hidden" name="source_kind" value="wrong_book">
+                <input type="hidden" name="order_mode" value="sequential">
+                <button class="ghost-button link-button" type="submit">重做全部错题</button>
+              </form>
+              <a class="ghost-button link-button" href="{{ url_for('bank_detail', bank_id=bank.bank_id) }}">返回题库</a>
+            </div>
           </div>
 
           {% for question_type in ["choice", "blank"] %}
@@ -26,7 +34,10 @@
                 <div class="wrong-question-stack">
                   {% for item in bank.types[question_type] %}
                     <article class="wrong-item">
-                      <h4>{{ item.prompt }}</h4>
+                      <div class="wrong-item-head">
+                        <h4>{{ item.prompt }}</h4>
+                        <span class="tag soft">{{ item.correct_streak }}/2 连对</span>
+                      </div>
                       {% if item.options %}
                         <ul class="option-list">
                           {% for option in item.options %}
@@ -34,10 +45,23 @@
                           {% endfor %}
                         </ul>
                       {% endif %}
-                      <p><strong>你的上次答案：</strong>{{ item.last_user_answer }}</p>
+                      <div class="answer-trail">
+                        {% for flag in item.answer_history[-8:] %}
+                          <span class="trail-dot {{ 'trail-correct' if flag else 'trail-wrong' }}"></span>
+                        {% endfor %}
+                      </div>
+                      <p><strong>上次答案：</strong>{{ item.last_user_answer }}</p>
                       <p><strong>正确答案：</strong>{{ item.answer }}</p>
                       <p><strong>讲解：</strong>{{ item.explanation }}</p>
-                      <p class="muted-line">累计答错 {{ item.wrong_count }} 次</p>
+                      <div class="inline-actions">
+                        <form method="post" action="{{ url_for('start_bank', bank_id=bank.bank_id) }}">
+                          <input type="hidden" name="mode" value="{{ question_type }}">
+                          <input type="hidden" name="source_kind" value="wrong_book">
+                          <input type="hidden" name="order_mode" value="sequential">
+                          <button class="primary-button" type="submit">重做这一类错题</button>
+                        </form>
+                        <span class="muted-line">累计答错 {{ item.wrong_count }} 次</span>
+                      </div>
                     </article>
                   {% endfor %}
                 </div>

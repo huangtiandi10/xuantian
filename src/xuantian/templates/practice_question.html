@@ -10,7 +10,11 @@
         <h1>第 {{ current_number }} / {{ total_questions }} 题</h1>
         <p class="muted-line">跟着节奏往下做，提交后会立即看到答案讲解和结果反馈。</p>
       </div>
-      <span class="tag">{{ question_type_labels[question.type] }}</span>
+      <div class="top-meta-stack">
+        <span class="tag">{{ question_type_labels[question.type] }}</span>
+        <span class="tag soft">{{ order_mode_labels[session_row["order_mode"]] }}</span>
+        <span class="tag soft">{{ source_kind_labels[session_row["source_kind"]] }}</span>
+      </div>
     </div>
 
     <div class="question-block">
@@ -37,6 +41,14 @@
         {% endif %}
       </form>
     </div>
+
+    {% if question_history is defined %}
+      <div class="answer-trail">
+        {% for flag in question_history[-8:] %}
+          <span class="trail-dot {{ 'trail-correct' if flag else 'trail-wrong' }}"></span>
+        {% endfor %}
+      </div>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

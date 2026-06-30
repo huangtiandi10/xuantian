@@ -9,7 +9,10 @@ from flask import Flask, flash, g, redirect, render_template, request, session, 
 
 from .repository import (
     QUESTION_TYPE_LABELS,
+    ORDER_MODE_LABELS,
+    SOURCE_KIND_LABELS,
     active_sessions_for_user,
+    abandon_active_sessions,
     authenticate_user,
     clear_feedback_ack,
     create_session,
@@ -29,6 +32,7 @@ from .repository import (
     load_bank_from_row,
     record_answer,
     refresh_bank_from_source,
+    wrong_question_ids_for_bank,
     wrong_book_by_bank,
 )
 
@@ -65,6 +69,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         return {
             "app_name": app.config["APP_NAME"],
             "question_type_labels": QUESTION_TYPE_LABELS,
+            "order_mode_labels": ORDER_MODE_LABELS,
+            "source_kind_labels": SOURCE_KIND_LABELS,
             "option_letter": lambda index: chr(65 + index),
         }
 
@@ -203,29 +209,71 @@ def create_app(test_config: dict | None = None) -> Flask:
     @login_required
     def start_bank(bank_id: int):
         mode = request.form.get("mode", "all")
+        order_mode = request.form.get("order_mode", "shuffle")
+        source_kind = request.form.get("source_kind", "bank")
+        restart_progress = request.form.get("restart_progress") == "on"
         if mode not in {"choice", "blank", "all"}:
             flash("题型模式无效。", "error")
             return redirect(url_for("bank_detail", bank_id=bank_id))
+        if order_mode not in {"sequential", "shuffle"}:
+            flash("顺序模式无效。", "error")
+            return redirect(url_for("bank_detail", bank_id=bank_id))
+        if source_kind not in {"bank", "wrong_book"}:
+            flash("练习来源无效。", "error")
+            return redirect(url_for("bank_detail", bank_id=bank_id))
 
         db_path = Path(app.config["DATABASE_PATH"])
-        existing = get_active_session_for_mode(db_path, int(g.user["id"]), bank_id, mode)
-        if existing:
+        existing = get_active_session_for_mode(db_path, int(g.user["id"]), bank_id, mode, source_kind)
+        if existing and not restart_progress:
             flash("已恢复上次未完成的进度。", "success")
             return redirect(url_for("practice_session", session_id=int(existing["id"])))
+
+        if restart_progress:
+            abandon_active_sessions(db_path, int(g.user["id"]), bank_id, mode, source_kind)
 
         bank_row = get_bank_for_user(db_path, int(g.user["id"]), bank_id)
         if not bank_row:
             flash("题库不存在。", "error")
             return redirect(url_for("dashboard"))
-        bank = load_bank_from_row(bank_row)
-        questions = filter_bank_questions(bank, mode)
-        if not questions:
-            flash("当前题库里没有这个题型。", "error")
-            return redirect(url_for("bank_detail", bank_id=bank_id))
 
-        question_ids = [question.id for question in questions]
-        random.shuffle(question_ids)
-        session_id = create_session(db_path, int(g.user["id"]), bank_id, mode, question_ids)
+        if source_kind == "wrong_book":
+            question_ids = wrong_question_ids_for_bank(
+                db_path,
+                int(g.user["id"]),
+                bank_id,
+                mode if mode != "all" else "choice",
+            )
+            if mode == "all":
+                question_ids = wrong_question_ids_for_bank(db_path, int(g.user["id"]), bank_id, "choice") + wrong_question_ids_for_bank(
+                    db_path,
+                    int(g.user["id"]),
+                    bank_id,
+                    "blank",
+                )
+            if not question_ids:
+                flash("这个题库的错题还不够开始练习。", "error")
+                return redirect(url_for("wrong_book"))
+        else:
+            bank = load_bank_from_row(bank_row)
+            questions = filter_bank_questions(bank, mode)
+            if not questions:
+                flash("当前题库里没有这个题型。", "error")
+                return redirect(url_for("bank_detail", bank_id=bank_id))
+
+            question_ids = [question.id for question in questions]
+
+        if order_mode == "shuffle":
+            random.shuffle(question_ids)
+
+        session_id = create_session(
+            db_path,
+            int(g.user["id"]),
+            bank_id,
+            mode,
+            order_mode,
+            source_kind,
+            question_ids,
+        )
         flash("新的练习已开始。", "success")
         return redirect(url_for("practice_session", session_id=session_id))
 
@@ -250,12 +298,30 @@ def create_app(test_config: dict | None = None) -> Flask:
 
         question_order = session_row["question_order_json"]
         total_questions = len(json.loads(question_order))
+        history_item = None
+        if session_row["source_kind"] == "wrong_book":
+            history_item = next(
+                (
+                    item
+                    for item in wrong_book_by_bank(db_path, int(g.user["id"]))
+                    if item["bank_id"] == int(session_row["bank_id"])
+                ),
+                None,
+            )
+        question_history = []
+        if history_item:
+            for kind_items in history_item["types"].values():
+                for item in kind_items:
+                    if item["question_id"] == question.id:
+                        question_history = item.get("answer_history", [])
+                        break
         return render_template(
             "practice_question.html",
             session_row=session_row,
             question=question,
             current_number=int(session_row["current_index"]) + 1,
             total_questions=total_questions,
+            question_history=question_history,
         )
 
     @app.post("/sessions/<int:session_id>/answer")

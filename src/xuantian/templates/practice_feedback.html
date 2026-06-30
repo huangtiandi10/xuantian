@@ -17,6 +17,15 @@
       <div class="review-head">
         <span class="tag">{{ question_type_labels[feedback["question_type"]] }}</span>
         <h2>{{ feedback["prompt"] }}</h2>
+        {% if feedback.get("wrong_book_state") %}
+          <p class="muted-line">
+            {% if feedback["wrong_book_state"]["resolved"] %}
+              这道错题已经连续答对，已从错题集移除。
+            {% else %}
+              还差 {{ feedback["wrong_book_state"]["remaining"] }} 次连续答对即可移除。
+            {% endif %}
+          </p>
+        {% endif %}
       </div>
 
       <div class="answer-compare-grid">
