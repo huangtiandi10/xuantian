@@ -2,3 +2,5 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *_wrong_book.json
+.xuantian_data/
+*.json

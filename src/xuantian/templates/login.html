@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}登录 - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="hero hero-auth">
+  <div class="hero-copy">
+    <p class="eyebrow">Local Quiz Workspace</p>
+    <h1>登录后继续你的题库练习</h1>
+    <p>本地账户会保存你的题库、未完成进度，以及按题库和题型拆分的错题集。</p>
+  </div>
+  <div class="panel auth-panel">
+    <h2>登录</h2>
+    <form method="post" class="stack-form">
+      <label>
+        <span>用户名</span>
+        <input type="text" name="username" placeholder="例如 xt_student" required>
+      </label>
+      <label>
+        <span>密码</span>
+        <input type="password" name="password" placeholder="至少 6 位" required>
+      </label>
+      <button class="primary-button" type="submit">进入题练空间</button>
+    </form>
+    <p class="muted-line">还没有账号？<a href="{{ url_for('register') }}">立即注册</a></p>
+  </div>
+</section>
+{% endblock %}

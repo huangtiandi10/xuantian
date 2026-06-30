@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}答题中 - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="section narrow">
+  <div class="panel practice-panel">
+    <div class="practice-head">
+      <div>
+        <p class="eyebrow">{{ session_row["bank_title"] }}</p>
+        <h1>第 {{ current_number }} / {{ total_questions }} 题</h1>
+      </div>
+      <span class="tag">{{ question_type_labels[question.type] }}</span>
+    </div>
+
+    <div class="question-block">
+      <h2>{{ question.prompt }}</h2>
+      <form method="post" action="{{ url_for('submit_answer', session_id=session_row['id']) }}" class="stack-form">
+        {% if question.type == "choice" %}
+          <div class="choice-grid">
+            {% for option in question.options %}
+              <button class="choice-button" type="submit" name="answer" value="{{ question.option_letters()[loop.index0] }}">
+                <span class="choice-letter">{{ question.option_letters()[loop.index0] }}</span>
+                <span>{{ option }}</span>
+              </button>
+            {% endfor %}
+          </div>
+        {% else %}
+          <label>
+            <span>填写答案</span>
+            <input type="text" name="blank_answer" placeholder="在这里输入你的答案" autocomplete="off" required>
+          </label>
+          <button class="primary-button" type="submit">提交答案</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

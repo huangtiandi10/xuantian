@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ bank.title }} - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="hero hero-bank">
+  <div class="hero-copy">
+    <p class="eyebrow">Question Bank</p>
+    <h1>{{ bank.title }}</h1>
+    <p>{{ bank.description or "这个题库暂时没有额外说明。" }}</p>
+    <div class="meta-wrap">
+      <span class="tag">{{ bank_row["question_count"] }} 题</span>
+      <span class="tag soft">{{ bank_row["wrong_count"] }} 条错题</span>
+      <span class="tag soft">{{ bank_row["source_name"] }}</span>
+    </div>
+  </div>
+  {% if bank_row["source_path"] %}
+    <form method="post" action="{{ url_for('refresh_bank', bank_id=bank_row['id']) }}">
+      <button class="ghost-button" type="submit">从本地源文件刷新</button>
+    </form>
+  {% endif %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>开始练习</h2>
+    <p>按题型开启新的练习；如果该模式有未完成进度，会自动续上次的题。</p>
+  </div>
+  <div class="card-grid">
+    {% for mode in ["choice", "blank", "all"] %}
+      <article class="panel compact-card">
+        <p class="card-kicker">{{ question_type_labels[mode] }}</p>
+        <h3>{{ mode_counts[mode] }} 题可练</h3>
+        <form method="post" action="{{ url_for('start_bank', bank_id=bank_row['id']) }}">
+          <input type="hidden" name="mode" value="{{ mode }}">
+          <button class="primary-button" type="submit">进入 {{ question_type_labels[mode] }}</button>
+        </form>
+      </article>
+    {% endfor %}
+  </div>
+</section>
+
+{% if active_sessions %}
+  <section class="section">
+    <div class="section-head">
+      <h2>当前题库的未完成进度</h2>
+      <p>这些进度会持续保留，直到你完成本轮。</p>
+    </div>
+    <div class="card-grid">
+      {% for item in active_sessions %}
+        <article class="panel compact-card">
+          <p class="card-kicker">{{ question_type_labels[item["mode"]] }}</p>
+          <h3>已做 {{ item["answered_count"] }} 题</h3>
+          <p>答对 {{ item["correct_count"] }} 题</p>
+          <a class="primary-button" href="{{ url_for('practice_session', session_id=item['id']) }}">继续</a>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+<section class="section">
+  <div class="section-head">
+    <h2>题库预览</h2>
+    <p>先看一下题目结构，确认导入是否符合预期。</p>
+  </div>
+  <div class="panel question-preview-list">
+    {% for question in bank.questions[:6] %}
+      <article class="preview-item">
+        <p class="tag">{{ question_type_labels[question.type] }}</p>
+        <h3>{{ loop.index }}. {{ question.prompt }}</h3>
+        {% if question.options %}
+          <ul class="option-list">
+            {% for option in question.options %}
+              <li>{{ option_letter(loop.index0) }}. {{ option }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}题库首页 - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy">
+    <p class="eyebrow">Dashboard</p>
+    <h1>你的本地题库空间</h1>
+    <p>这里会记住你已经保存的题库、上次做到哪一题，以及每个题库沉淀下来的错题。</p>
+  </div>
+  <div class="hero-actions">
+    <a class="primary-button" href="{{ url_for('import_bank') }}">导入新题库</a>
+    <a class="ghost-button link-button" href="{{ url_for('wrong_book') }}">查看错题集</a>
+  </div>
+</section>
+
+{% if active_sessions %}
+  <section class="section">
+    <div class="section-head">
+      <h2>未完成进度</h2>
+      <p>下次打开程序可以直接从这里继续。</p>
+    </div>
+    <div class="card-grid">
+      {% for item in active_sessions %}
+        <article class="panel compact-card">
+          <p class="card-kicker">{{ item["bank_title"] }}</p>
+          <h3>{{ question_type_labels[item["mode"]] }}</h3>
+          <p>已做 {{ item["answered_count"] }} 题，答对 {{ item["correct_count"] }} 题</p>
+          <a class="primary-button" href="{{ url_for('practice_session', session_id=item['id']) }}">继续练习</a>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+<section class="section">
+  <div class="section-head">
+    <h2>已保存题库</h2>
+    <p>题库保存后，下次不用重新上传，也可以继续之前的学习记录。</p>
+  </div>
+  {% if banks %}
+    <div class="card-grid">
+      {% for bank in banks %}
+        <article class="panel bank-card">
+          <div class="card-meta-row">
+            <span class="tag">{{ bank["question_count"] }} 题</span>
+            <span class="tag soft">{{ bank["wrong_count"] }} 条错题</span>
+          </div>
+          <h3>{{ bank["title"] }}</h3>
+          <p>{{ bank["description"] or "这个题库还没有补充说明。" }}</p>
+          <p class="muted-line">来源：{{ bank["source_name"] }}</p>
+          <div class="inline-actions">
+            <a class="primary-button" href="{{ url_for('bank_detail', bank_id=bank['id']) }}">进入题库</a>
+            {% if bank["active_session_count"] %}
+              <span class="status-pill">有未完成进度</span>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="panel empty-state">
+      <h3>还没有保存的题库</h3>
+      <p>先导入一个 JSON 题库，后面它会长期留在这里。</p>
+      <a class="primary-button" href="{{ url_for('import_bank') }}">导入第一个题库</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

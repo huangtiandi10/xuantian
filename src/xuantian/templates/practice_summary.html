@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}练习完成 - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="section narrow">
+  <div class="panel summary-panel">
+    <p class="eyebrow">{{ session_row["bank_title"] }}</p>
+    <h1>本轮练习完成</h1>
+    <div class="summary-stats">
+      <div>
+        <strong>{{ session_row["answered_count"] }}</strong>
+        <span>已作答</span>
+      </div>
+      <div>
+        <strong>{{ session_row["correct_count"] }}</strong>
+        <span>答对</span>
+      </div>
+      <div>
+        <strong>{{ accuracy }}%</strong>
+        <span>正确率</span>
+      </div>
+      <div>
+        <strong>{{ question_type_labels[session_row["mode"]] }}</strong>
+        <span>练习模式</span>
+      </div>
+    </div>
+    <div class="inline-actions center">
+      <a class="primary-button" href="{{ url_for('bank_detail', bank_id=session_row['bank_id']) }}">回到题库</a>
+      <a class="ghost-button link-button" href="{{ url_for('wrong_book') }}">查看错题集</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

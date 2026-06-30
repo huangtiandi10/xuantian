@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}注册 - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="hero hero-auth">
+  <div class="hero-copy">
+    <p class="eyebrow">Create Your Local Account</p>
+    <h1>先创建一个本地学习账户</h1>
+    <p>这个账户只保存在你的本机，用来维护题库、学习进度和错题记录。</p>
+  </div>
+  <div class="panel auth-panel">
+    <h2>注册</h2>
+    <form method="post" class="stack-form">
+      <label>
+        <span>用户名</span>
+        <input type="text" name="username" minlength="3" required>
+      </label>
+      <label>
+        <span>密码</span>
+        <input type="password" name="password" minlength="6" required>
+      </label>
+      <button class="primary-button" type="submit">创建账户</button>
+    </form>
+    <p class="muted-line">已经有账号？<a href="{{ url_for('login') }}">返回登录</a></p>
+  </div>
+</section>
+{% endblock %}

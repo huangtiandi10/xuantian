@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}错题集 - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="section-head">
+    <h1>错题集</h1>
+    <p>这里已经按题库分组，并在每个题库下按题型进行二次分类。</p>
+  </div>
+
+  {% if grouped %}
+    <div class="wrong-bank-stack">
+      {% for bank in grouped %}
+        <article class="panel wrong-bank-card">
+          <div class="section-head">
+            <h2>{{ bank.bank_title }}</h2>
+            <a class="ghost-button link-button" href="{{ url_for('bank_detail', bank_id=bank.bank_id) }}">返回题库</a>
+          </div>
+
+          {% for question_type in ["choice", "blank"] %}
+            <section class="wrong-type-block">
+              <div class="subhead">
+                <h3>{{ question_type_labels[question_type] }}</h3>
+                <span class="tag">{{ bank.types[question_type] | length }} 题</span>
+              </div>
+              {% if bank.types[question_type] %}
+                <div class="wrong-question-stack">
+                  {% for item in bank.types[question_type] %}
+                    <article class="wrong-item">
+                      <h4>{{ item.prompt }}</h4>
+                      {% if item.options %}
+                        <ul class="option-list">
+                          {% for option in item.options %}
+                            <li>{{ option_letter(loop.index0) }}. {{ option }}</li>
+                          {% endfor %}
+                        </ul>
+                      {% endif %}
+                      <p><strong>你的上次答案：</strong>{{ item.last_user_answer }}</p>
+                      <p><strong>正确答案：</strong>{{ item.answer }}</p>
+                      <p><strong>讲解：</strong>{{ item.explanation }}</p>
+                      <p class="muted-line">累计答错 {{ item.wrong_count }} 次</p>
+                    </article>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="muted-line">这个分类下暂时没有错题。</p>
+              {% endif %}
+            </section>
+          {% endfor %}
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="panel empty-state">
+      <h3>还没有错题</h3>
+      <p>开始做题后，答错的内容会自动按题库和题型沉淀到这里。</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

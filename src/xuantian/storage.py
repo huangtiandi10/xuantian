@@ -15,6 +15,14 @@ def load_question_bank(path: str | Path) -> QuestionBank:
     with bank_path.open("r", encoding="utf-8") as file:
         raw = json.load(file)
 
+    return load_question_bank_from_raw(raw)
+
+
+def load_question_bank_from_json_text(raw_text: str) -> QuestionBank:
+    return load_question_bank_from_raw(json.loads(raw_text))
+
+
+def load_question_bank_from_raw(raw: dict[str, Any]) -> QuestionBank:
     if not isinstance(raw, dict):
         raise ValueError("题库文件格式错误，根节点必须是对象")
 

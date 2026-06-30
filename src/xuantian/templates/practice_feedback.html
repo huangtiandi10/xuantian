@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}作答反馈 - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="section narrow">
+  <div class="panel practice-panel">
+    <div class="result-banner {{ 'result-correct' if feedback['is_correct'] else 'result-wrong' }}">
+      <p class="eyebrow">{{ session_row["bank_title"] }}</p>
+      <h1>{{ "回答正确" if feedback["is_correct"] else "回答错误" }}</h1>
+      <p>第 {{ feedback["question_number"] }} / {{ feedback["total_questions"] }} 题</p>
+    </div>
+
+    <div class="answer-review">
+      <h2>{{ feedback["prompt"] }}</h2>
+      <p><strong>你的答案：</strong>{{ feedback["user_answer"] }}</p>
+      <p><strong>正确答案：</strong>{{ feedback["correct_answer"] }}</p>
+      <div class="explanation-box">
+        <h3>讲解</h3>
+        <p>{{ feedback["explanation"] }}</p>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('practice_next', session_id=session_row['id']) }}">
+      <button class="primary-button" type="submit">
+        {{ "查看本轮结果" if session_row["status"] == "finished" else "下一题" }}
+      </button>
+    </form>
+  </div>
+</section>
+{% endblock %}

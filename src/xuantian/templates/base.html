@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="{{ url_for('dashboard') if g.user else url_for('login') }}">
+          <span class="brand-badge">XT</span>
+          <span>
+            <strong>{{ app_name }}</strong>
+            <small>本地互动题库系统</small>
+          </span>
+        </a>
+        {% if g.user %}
+          <nav class="topnav">
+            <a href="{{ url_for('dashboard') }}">题库</a>
+            <a href="{{ url_for('import_bank') }}">导入题库</a>
+            <a href="{{ url_for('wrong_book') }}">错题集</a>
+            <span class="user-pill">{{ g.user["username"] }}</span>
+            <form method="post" action="{{ url_for('logout') }}">
+              <button class="ghost-button" type="submit">退出</button>
+            </form>
+          </nav>
+        {% endif %}
+      </header>
+
+      <main class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <section class="flash-stack">
+              {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+              {% endfor %}
+            </section>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+</html>

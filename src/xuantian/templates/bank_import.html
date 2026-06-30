@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}导入题库 - {{ app_name }}{% endblock %}
+{% block content %}
+<section class="section narrow">
+  <div class="section-head">
+    <h1>导入题库</h1>
+    <p>你可以直接填写本地 JSON 路径，也可以上传文件。保存后，下次会直接出现在你的题库列表里。</p>
+  </div>
+
+  <div class="dual-grid">
+    <article class="panel">
+      <h2>方式一：填写本地路径</h2>
+      <form method="post" class="stack-form">
+        <label>
+          <span>题库路径</span>
+          <input type="text" name="source_path" placeholder="/Users/you/Desktop/bank.json">
+        </label>
+        <button class="primary-button" type="submit">按本地路径导入</button>
+      </form>
+    </article>
+
+    <article class="panel">
+      <h2>方式二：上传 JSON 文件</h2>
+      <form method="post" enctype="multipart/form-data" class="stack-form">
+        <label>
+          <span>选择题库文件</span>
+          <input type="file" name="bank_file" accept=".json,application/json">
+        </label>
+        <button class="primary-button" type="submit">上传并保存</button>
+      </form>
+    </article>
+  </div>
+</section>
+{% endblock %}

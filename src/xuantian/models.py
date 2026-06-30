@@ -53,12 +53,37 @@ class Question:
         )
 
     def matches_answer(self, user_answer: str) -> bool:
-        expected = self.answer.strip().lower()
-        actual = user_answer.strip().lower()
-
         if self.type == "choice":
-            return actual == expected
-        return actual == expected
+            actual = self.normalize_choice_answer(user_answer)
+            expected = self.normalize_choice_answer(self.answer)
+            if actual == expected:
+                return True
+            if self.options and expected not in self.option_letters():
+                return user_answer.strip().lower() == self.answer.strip().lower()
+            return False
+        return user_answer.strip().lower() == self.answer.strip().lower()
+
+    def option_letters(self) -> list[str]:
+        if not self.options:
+            return []
+        return [chr(65 + index) for index, _ in enumerate(self.options)]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "type": self.type,
+            "prompt": self.prompt,
+            "answer": self.answer,
+            "explanation": self.explanation,
+            "options": self.options,
+        }
+
+    @staticmethod
+    def normalize_choice_answer(value: str) -> str:
+        answer = value.strip().upper()
+        if answer and len(answer) == 1 and answer.isalpha():
+            return answer
+        return value.strip().lower()
 
 
 @dataclass(slots=True)
@@ -67,3 +92,12 @@ class QuestionBank:
     description: str
     questions: list[Question]
 
+    def question_map(self) -> dict[str, Question]:
+        return {question.id: question for question in self.questions}
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "title": self.title,
+            "description": self.description,
+            "questions": [question.to_dict() for question in self.questions],
+        }

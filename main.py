@@ -9,9 +9,11 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from xuantian.cli import main
+from xuantian import create_app
+
+
+app = create_app()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
-
+    app.run(debug=False, host="127.0.0.1", port=5000)
