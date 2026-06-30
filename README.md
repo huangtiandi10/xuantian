@@ -89,14 +89,3 @@ http://127.0.0.1:5000
 ```bash
 python3 -m pytest
 ```
-
-## GitHub 远程仓库
-
-先在 GitHub 创建一个空仓库，然后执行：
-
-```bash
-git add .
-git commit -m "feat: build local web quiz app"
-git remote add origin git@github.com:你的用户名/你的仓库名.git
-git push -u origin main
-```
