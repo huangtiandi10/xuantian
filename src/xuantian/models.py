@@ -68,6 +68,32 @@ class Question:
             return []
         return [chr(65 + index) for index, _ in enumerate(self.options)]
 
+    def choice_index_for_answer(self, value: str) -> int | None:
+        if self.type != "choice" or not self.options:
+            return None
+
+        normalized = self.normalize_choice_answer(value)
+        letters = self.option_letters()
+        if normalized in letters:
+            return letters.index(normalized)
+
+        raw_value = value.strip().lower()
+        if not raw_value:
+            return None
+
+        for index, option in enumerate(self.options):
+            if raw_value == option.strip().lower():
+                return index
+        return None
+
+    def display_answer(self, value: str) -> str:
+        cleaned_value = value.strip()
+        if self.type == "choice" and self.options:
+            choice_index = self.choice_index_for_answer(value)
+            if choice_index is not None:
+                return f"{self.option_letters()[choice_index]}. {self.options[choice_index]}"
+        return cleaned_value
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,

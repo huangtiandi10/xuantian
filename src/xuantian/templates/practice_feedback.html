@@ -1,18 +1,68 @@
 {% extends "base.html" %}
 {% block title %}作答反馈 - {{ app_name }}{% endblock %}
+{% block page_heading %}作答反馈{% endblock %}
 {% block content %}
 <section class="section narrow">
   <div class="panel practice-panel">
     <div class="result-banner {{ 'result-correct' if feedback['is_correct'] else 'result-wrong' }}">
-      <p class="eyebrow">{{ session_row["bank_title"] }}</p>
-      <h1>{{ "回答正确" if feedback["is_correct"] else "回答错误" }}</h1>
-      <p>第 {{ feedback["question_number"] }} / {{ feedback["total_questions"] }} 题</p>
+      <div>
+        <p class="eyebrow">{{ session_row["bank_title"] }}</p>
+        <h1>{{ "回答正确" if feedback["is_correct"] else "回答错误" }}</h1>
+        <p>第 {{ feedback["question_number"] }} / {{ feedback["total_questions"] }} 题</p>
+      </div>
+      <span class="result-mark">{{ "Correct" if feedback["is_correct"] else "Retry" }}</span>
     </div>
 
     <div class="answer-review">
-      <h2>{{ feedback["prompt"] }}</h2>
-      <p><strong>你的答案：</strong>{{ feedback["user_answer"] }}</p>
-      <p><strong>正确答案：</strong>{{ feedback["correct_answer"] }}</p>
+      <div class="review-head">
+        <span class="tag">{{ question_type_labels[feedback["question_type"]] }}</span>
+        <h2>{{ feedback["prompt"] }}</h2>
+      </div>
+
+      <div class="answer-compare-grid">
+        <article class="answer-card answer-card-user {{ 'answer-card-good' if feedback['is_correct'] else 'answer-card-bad' }}">
+          <span class="answer-label">你的答案</span>
+          <strong>{{ feedback["user_answer"] }}</strong>
+          {% if feedback["question_type"] == "choice" %}
+            <p>{{ feedback["user_answer_display"] }}</p>
+          {% endif %}
+        </article>
+
+        <article class="answer-card answer-card-correct">
+          <span class="answer-label">正确答案</span>
+          <strong>{{ feedback["correct_answer"] }}</strong>
+          {% if feedback["question_type"] == "choice" %}
+            <p>{{ feedback["correct_answer_display"] }}</p>
+          {% endif %}
+        </article>
+      </div>
+
+      {% if feedback["question_type"] == "choice" and feedback["options"] %}
+        <div class="option-review">
+          <h3>选项对照</h3>
+          <div class="option-review-list">
+            {% for option in feedback["options"] %}
+              {% set letter = option_letter(loop.index0) %}
+              <article class="option-review-item {% if letter == feedback['correct_answer'] %}option-correct{% endif %} {% if letter == feedback['user_answer'] and not feedback['is_correct'] %}option-user-wrong{% endif %}">
+                <span class="choice-letter">{{ letter }}</span>
+                <div>
+                  <strong>{{ option }}</strong>
+                  <p>
+                    {% if letter == feedback["correct_answer"] %}
+                      正确答案
+                    {% elif letter == feedback["user_answer"] %}
+                      你的选择
+                    {% else %}
+                      备选项
+                    {% endif %}
+                  </p>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
       <div class="explanation-box">
         <h3>讲解</h3>
         <p>{{ feedback["explanation"] }}</p>

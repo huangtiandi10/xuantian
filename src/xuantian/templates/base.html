@@ -6,42 +6,88 @@
     <title>{% block title %}{{ app_name }}{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
-  <body>
-    <div class="page-shell">
-      <header class="topbar">
-        <a class="brand" href="{{ url_for('dashboard') if g.user else url_for('login') }}">
-          <span class="brand-badge">XT</span>
-          <span>
-            <strong>{{ app_name }}</strong>
-            <small>本地互动题库系统</small>
-          </span>
-        </a>
-        {% if g.user %}
-          <nav class="topnav">
-            <a href="{{ url_for('dashboard') }}">题库</a>
-            <a href="{{ url_for('import_bank') }}">导入题库</a>
-            <a href="{{ url_for('wrong_book') }}">错题集</a>
-            <span class="user-pill">{{ g.user["username"] }}</span>
-            <form method="post" action="{{ url_for('logout') }}">
-              <button class="ghost-button" type="submit">退出</button>
-            </form>
-          </nav>
-        {% endif %}
-      </header>
+  <body class="{% if g.user %}app-has-sidebar{% endif %}">
+    {% if g.user %}
+      <input class="sidebar-toggle" id="sidebar-toggle" type="checkbox">
+    {% endif %}
 
-      <main class="content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            <section class="flash-stack">
-              {% for category, message in messages %}
-                <div class="flash flash-{{ category }}">{{ message }}</div>
-              {% endfor %}
-            </section>
+    <div class="app-frame">
+      {% if g.user %}
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <div class="sidebar-top">
+              <a class="brand" href="{{ url_for('dashboard') }}">
+                <span class="brand-badge">XT</span>
+                <span class="brand-copy">
+                  <strong>{{ app_name }}</strong>
+                  <small>本地互动题库系统</small>
+                </span>
+              </a>
+              <label class="sidebar-pin" for="sidebar-toggle" title="固定展开或收起侧边栏">
+                <span class="pin-open">收起</span>
+                <span class="pin-closed">展开</span>
+              </label>
+            </div>
+
+            <nav class="sidebar-nav">
+              <a href="{{ url_for('dashboard') }}">题库首页</a>
+              <a href="{{ url_for('import_bank') }}">导入题库</a>
+              <a href="{{ url_for('wrong_book') }}">错题集</a>
+            </nav>
+
+            <div class="sidebar-footer">
+              <div class="user-card">
+                <span class="user-pill">{{ g.user["username"] }}</span>
+                <p>继续练习，系统会自动保留你的进度和错题记录。</p>
+              </div>
+              <form method="post" action="{{ url_for('logout') }}">
+                <button class="ghost-button sidebar-logout" type="submit">退出登录</button>
+              </form>
+            </div>
+          </div>
+        </aside>
+
+        <label class="mobile-sidebar-button" for="sidebar-toggle">菜单</label>
+      {% endif %}
+
+      <div class="page-shell">
+        <header class="topbar">
+          <div class="topbar-copy">
+            {% if g.user %}
+              <p class="eyebrow">Learning Workspace</p>
+              <h1>{% block page_heading %}{{ app_name }}{% endblock %}</h1>
+            {% else %}
+              <a class="brand" href="{{ url_for('login') }}">
+                <span class="brand-badge">XT</span>
+                <span class="brand-copy">
+                  <strong>{{ app_name }}</strong>
+                  <small>本地互动题库系统</small>
+                </span>
+              </a>
+            {% endif %}
+          </div>
+          {% if g.user %}
+            <div class="topbar-meta">
+              <span class="status-pill">已登录</span>
+              <span class="user-pill">{{ g.user["username"] }}</span>
+            </div>
           {% endif %}
-        {% endwith %}
+        </header>
 
-        {% block content %}{% endblock %}
-      </main>
+        <main class="content">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <section class="flash-stack">
+                {% for category, message in messages %}
+                  <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+              </section>
+            {% endif %}
+          {% endwith %}
+
+          {% block content %}{% endblock %}
+        </main>
+      </div>
     </div>
   </body>
 </html>
