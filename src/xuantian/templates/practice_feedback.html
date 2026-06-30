@@ -56,15 +56,11 @@
                 <span class="choice-letter">{{ letter }}</span>
                 <div>
                   <strong>{{ option }}</strong>
-                  <p>
-                    {% if letter == feedback["correct_answer"] %}
-                      正确答案
-                    {% elif letter == feedback["user_answer"] %}
-                      你的选择
-                    {% else %}
-                      备选项
-                    {% endif %}
-                  </p>
+                  {% if letter == feedback["correct_answer"] %}
+                    <p>正确答案</p>
+                  {% elif letter == feedback["user_answer"] %}
+                    <p>你的选择</p>
+                  {% endif %}
                 </div>
               </article>
             {% endfor %}

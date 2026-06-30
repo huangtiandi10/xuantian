@@ -15,6 +15,7 @@
   --error-soft: rgba(212, 107, 117, 0.14);
   --shadow: 0 18px 40px rgba(83, 101, 120, 0.1);
   --sidebar-width: 290px;
+  --sidebar-peek: 22px;
 }
 
 * { box-sizing: border-box; }
@@ -45,16 +46,25 @@ button, input, select { font: inherit; }
 }
 
 .app-has-sidebar .app-frame {
-  display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  position: relative;
 }
 
 .sidebar {
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 0;
   height: 100vh;
   padding: 16px;
   width: var(--sidebar-width);
+  transform: translateX(calc(var(--sidebar-peek) - var(--sidebar-width)));
+  transition: transform 220ms ease;
+  z-index: 20;
+}
+
+.sidebar:hover,
+.sidebar:focus-within,
+.sidebar-toggle:checked ~ .app-frame .sidebar {
+  transform: translateX(0);
 }
 
 .sidebar-inner {
@@ -121,6 +131,43 @@ button, input, select { font: inherit; }
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--line);
 }
+.pin-open,
+.sidebar-toggle:checked ~ .app-frame .pin-closed {
+  display: none;
+}
+
+.sidebar-toggle:checked ~ .app-frame .pin-open {
+  display: inline;
+}
+
+.sidebar-toggle:checked ~ .app-frame .pin-closed {
+  display: none;
+}
+
+.pin-closed {
+  display: inline;
+}
+
+.sidebar::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 4px;
+  height: 72px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(125, 169, 216, 0.9), rgba(149, 200, 180, 0.85));
+  transform: translateY(-50%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.sidebar:hover::after,
+.sidebar:focus-within::after,
+.sidebar-toggle:checked ~ .app-frame .sidebar::after {
+  opacity: 0;
+}
+
 .mobile-sidebar-button { display: none; }
 .primary-button {
   display: inline-flex;
@@ -305,10 +352,11 @@ button, input, select { font: inherit; }
 .flash-success { background: rgba(79, 155, 122, 0.1); color: var(--success); }
 .flash-error { background: rgba(212, 107, 117, 0.1); color: var(--error); }
 
-.app-has-sidebar .page-shell { width: min(1220px, calc(100% - 32px)); }
+.app-has-sidebar .page-shell {
+  width: min(1220px, calc(100% - 36px));
+}
 
 @media (max-width: 980px) {
-  .app-has-sidebar .app-frame { grid-template-columns: 1fr; }
   .sidebar {
     position: fixed;
     left: 12px;
@@ -321,6 +369,11 @@ button, input, select { font: inherit; }
     padding: 0;
     z-index: 20;
   }
+  .sidebar:hover,
+  .sidebar:focus-within {
+    transform: translateY(-110%);
+  }
+  .sidebar::after { display: none; }
   .sidebar-toggle:checked ~ .app-frame .sidebar { transform: translateY(0); }
   .mobile-sidebar-button {
     display: inline-flex;
