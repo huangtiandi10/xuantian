@@ -287,6 +287,29 @@ def refresh_bank_from_source(db_path: Path, user_id: int, bank_id: int) -> tuple
     return True, "题库已从本地源文件刷新。"
 
 
+def delete_bank_for_user(db_path: Path, user_id: int, bank_id: int) -> tuple[bool, str]:
+    bank_row = get_bank_for_user(db_path, user_id, bank_id)
+    if not bank_row:
+        return False, "题库不存在。"
+
+    with get_connection(db_path) as connection:
+        connection.execute(
+            "DELETE FROM wrong_questions WHERE user_id = ? AND bank_id = ?",
+            (user_id, bank_id),
+        )
+        connection.execute(
+            "DELETE FROM practice_sessions WHERE user_id = ? AND bank_id = ?",
+            (user_id, bank_id),
+        )
+        connection.execute(
+            "DELETE FROM banks WHERE user_id = ? AND id = ?",
+            (user_id, bank_id),
+        )
+        connection.commit()
+
+    return True, f"题库《{bank_row['title']}》及对应错题集已删除。"
+
+
 def list_banks_for_user(db_path: Path, user_id: int) -> list[sqlite3.Row]:
     with get_connection(db_path) as connection:
         return connection.execute(

@@ -12,11 +12,16 @@
       <span class="tag soft">{{ bank_row["source_name"] }}</span>
     </div>
   </div>
-  {% if bank_row["source_path"] %}
-    <form method="post" action="{{ url_for('refresh_bank', bank_id=bank_row['id']) }}">
-      <button class="ghost-button" type="submit">从本地源文件刷新</button>
+  <div class="hero-actions">
+    {% if bank_row["source_path"] %}
+      <form method="post" action="{{ url_for('refresh_bank', bank_id=bank_row['id']) }}">
+        <button class="ghost-button" type="submit">从本地源文件刷新</button>
+      </form>
+    {% endif %}
+    <form method="post" action="{{ url_for('delete_bank', bank_id=bank_row['id']) }}" onsubmit='return confirm({{ ("确定要删除题库《" ~ bank.title ~ "》吗？对应的错题集和练习进度也会一起删除，此操作不可恢复。") | tojson }});'>
+      <button class="danger-button" type="submit">删除题库</button>
     </form>
-  {% endif %}
+  </div>
 </section>
 
 <section class="section">

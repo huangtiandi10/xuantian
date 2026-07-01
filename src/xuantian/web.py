@@ -18,6 +18,7 @@ from .repository import (
     create_session,
     create_user,
     current_question_from_session,
+    delete_bank_for_user,
     feedback_payload,
     feedback_for_index,
     filter_bank_questions,
@@ -208,6 +209,17 @@ def create_app(test_config: dict | None = None) -> Flask:
         )
         flash(message, "success" if success else "error")
         return redirect(url_for("bank_detail", bank_id=bank_id))
+
+    @app.post("/banks/<int:bank_id>/delete")
+    @login_required
+    def delete_bank(bank_id: int):
+        success, message = delete_bank_for_user(
+            Path(app.config["DATABASE_PATH"]),
+            int(g.user["id"]),
+            bank_id,
+        )
+        flash(message, "success" if success else "error")
+        return redirect(url_for("dashboard"))
 
     @app.post("/banks/<int:bank_id>/start")
     @login_required

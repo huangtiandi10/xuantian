@@ -81,6 +81,55 @@ def test_wrong_book_is_grouped_page(tmp_path: Path):
     assert "WrongBook" in bank_page.get_data(as_text=True)
 
 
+def test_delete_bank_removes_bank_sessions_and_wrong_book_entries(tmp_path: Path):
+    client = create_test_client(tmp_path)
+    register_and_login(client)
+
+    client.post(
+        "/banks/import",
+        data={
+            "bank_file": (
+                io.BytesIO(
+                    b'{"title":"DeleteMe","description":"demo","questions":[{"id":"q1","type":"choice","prompt":"2+2=?","options":["3","4"],"answer":"B","explanation":"2+2=4"}]}'
+                ),
+                "delete.json",
+            )
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    detail_response = client.get("/banks/1")
+    detail_text = detail_response.get_data(as_text=True)
+    assert "删除题库" in detail_text
+    assert 'action="/banks/1/delete"' in detail_text
+    assert "confirm(" in detail_text
+    assert "\\u9519\\u9898\\u96c6" in detail_text
+
+    client.post(
+        "/banks/1/start",
+        data={"mode": "choice", "order_mode": "sequential", "source_kind": "bank"},
+        follow_redirects=False,
+    )
+    client.post("/sessions/1/answer", data={"answer": "A"}, follow_redirects=True)
+
+    wrong_book_before_delete = client.get("/wrong-book").get_data(as_text=True)
+    assert "DeleteMe" in wrong_book_before_delete
+    assert "2+2=?" in wrong_book_before_delete
+
+    delete_response = client.post("/banks/1/delete", follow_redirects=True)
+    delete_text = delete_response.get_data(as_text=True)
+    assert "题库《DeleteMe》及对应错题集已删除。" in delete_text
+    assert "来源：delete.json" not in delete_text
+
+    wrong_book_after_delete = client.get("/wrong-book").get_data(as_text=True)
+    assert "DeleteMe" not in wrong_book_after_delete
+    assert "2+2=?" not in wrong_book_after_delete
+
+    deleted_session_response = client.get("/sessions/1", follow_redirects=True)
+    assert "练习记录不存在。" in deleted_session_response.get_data(as_text=True)
+
+
 def test_can_go_back_to_previous_feedback_and_jump_to_question(tmp_path: Path):
     client = create_test_client(tmp_path)
     register_and_login(client)

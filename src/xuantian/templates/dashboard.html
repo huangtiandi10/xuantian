@@ -50,6 +50,9 @@
           <p class="muted-line">来源：{{ bank["source_name"] }}</p>
           <div class="inline-actions">
             <a class="primary-button" href="{{ url_for('bank_detail', bank_id=bank['id']) }}">进入题库</a>
+            <form method="post" action="{{ url_for('delete_bank', bank_id=bank['id']) }}" onsubmit='return confirm({{ ("确定要删除题库《" ~ bank["title"] ~ "》吗？对应的错题集和练习进度也会一起删除，此操作不可恢复。") | tojson }});'>
+              <button class="danger-button" type="submit">删除题库</button>
+            </form>
             {% if bank["active_session_count"] %}
               <span class="status-pill">有未完成进度</span>
             {% endif %}

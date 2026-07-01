@@ -83,7 +83,7 @@ button, input, select { font: inherit; }
 .sidebar-top, .sidebar-footer, .stack-form, .section, .content, .answer-review { display: grid; gap: 14px; }
 .sidebar-nav { display: grid; gap: 10px; }
 .sidebar-nav a, .sidebar-logout, .sidebar-pin, .mobile-sidebar-button,
-.primary-button, .ghost-button, .choice-button { border: 0; border-radius: 16px; cursor: pointer; }
+.primary-button, .ghost-button, .danger-button, .choice-button { border: 0; border-radius: 16px; cursor: pointer; }
 .brand {
   display: flex;
   align-items: center;
@@ -178,7 +178,16 @@ button, input, select { font: inherit; }
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   box-shadow: 0 14px 24px rgba(125, 169, 216, 0.18);
 }
-.primary-button:hover, .ghost-button:hover, .choice-button:hover, .sidebar-pin:hover, .mobile-sidebar-button:hover {
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 18px;
+  color: var(--error);
+  background: rgba(212, 107, 117, 0.1);
+  border: 1px solid rgba(212, 107, 117, 0.24);
+}
+.primary-button:hover, .ghost-button:hover, .danger-button:hover, .choice-button:hover, .sidebar-pin:hover, .mobile-sidebar-button:hover {
   transform: translateY(-1px);
 }
 
