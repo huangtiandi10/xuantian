@@ -72,15 +72,21 @@
         <div class="option-review">
           <h3>选项对照</h3>
           <div class="option-review-list">
+            {% set correct_letters = feedback.get("correct_answer_letters") or feedback["correct_answer"] %}
+            {% set user_letters = feedback.get("user_answer_letters") or feedback["user_answer"] %}
             {% for option in feedback["options"] %}
               {% set letter = option_letter(loop.index0) %}
-              <article class="option-review-item {% if letter == feedback['correct_answer'] %}option-correct{% endif %} {% if letter == feedback['user_answer'] and not feedback['is_correct'] %}option-user-wrong{% endif %}">
+              {% set is_correct_answer = letter in correct_letters %}
+              {% set is_user_answer = letter in user_letters %}
+              <article class="option-review-item {% if is_correct_answer %}option-correct{% endif %} {% if is_user_answer and not is_correct_answer %}option-user-wrong{% endif %}">
                 <span class="choice-letter">{{ letter }}</span>
                 <div>
                   <strong>{{ option }}</strong>
-                  {% if letter == feedback["correct_answer"] %}
+                  {% if is_correct_answer and is_user_answer %}
+                    <p>正确答案，你已选择</p>
+                  {% elif is_correct_answer %}
                     <p>正确答案</p>
-                  {% elif letter == feedback["user_answer"] %}
+                  {% elif is_user_answer %}
                     <p>你的选择</p>
                   {% endif %}
                 </div>

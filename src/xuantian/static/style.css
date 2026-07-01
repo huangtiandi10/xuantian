@@ -292,7 +292,20 @@ button, input, select { font: inherit; }
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(237, 247, 244, 0.9));
   border: 1px solid rgba(125, 169, 216, 0.14);
 }
+.choice-check-button { cursor: pointer; }
+.choice-check-button:has(.choice-input:checked) {
+  border-color: rgba(79, 155, 122, 0.44);
+  background: linear-gradient(180deg, rgba(237, 247, 244, 0.98), rgba(218, 238, 231, 0.94));
+  box-shadow: 0 10px 24px rgba(79, 155, 122, 0.12);
+}
+.choice-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex: none;
+}
 .choice-button:disabled,
+.choice-check-button:has(.choice-input:disabled),
 .primary-button:disabled,
 .ghost-button:disabled {
   cursor: not-allowed;

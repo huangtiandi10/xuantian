@@ -146,3 +146,61 @@ def test_choice_answer_display_does_not_duplicate_existing_option_prefix():
     )
 
     assert question.display_answer("B") == "B.127.21.19.109"
+
+
+def test_multiple_choice_answer_matches_all_selected_letters():
+    question = Question(
+        id="q",
+        type="choice",
+        prompt="Which are even?",
+        options=["1", "2", "3", "4"],
+        answer="B,D",
+        explanation="2 and 4",
+    )
+
+    assert question.is_multiple_choice_answer()
+    assert question.matches_answer("DB")
+    assert not question.matches_answer("B")
+    assert question.display_answer("DB") == "B. 2；D. 4"
+
+
+def test_multiple_choice_renders_checkbox_submit_and_records_answer(tmp_path: Path):
+    client = create_test_client(tmp_path)
+    register_and_login(client)
+
+    client.post(
+        "/banks/import",
+        data={
+            "bank_file": (
+                io.BytesIO(
+                    b'{"title":"Multi","description":"demo","questions":[{"id":"q1","type":"choice","prompt":"Which are even?","options":["1","2","3","4"],"answer":"BD","explanation":"2 and 4"}]}'
+                ),
+                "multi.json",
+            )
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    start_response = client.post(
+        "/banks/1/start",
+        data={"mode": "choice", "order_mode": "sequential", "source_kind": "bank"},
+        follow_redirects=False,
+    )
+    session_path = start_response.headers["Location"]
+
+    question_response = client.get(session_path)
+    question_text = question_response.get_data(as_text=True)
+    assert 'type="checkbox"' in question_text
+    assert "这道题有多个正确选项" in question_text
+    assert "提交答案" in question_text
+
+    feedback_response = client.post(
+        "/sessions/1/answer",
+        data={"answer": ["B", "D"]},
+        follow_redirects=True,
+    )
+    feedback_text = feedback_response.get_data(as_text=True)
+    assert "回答正确" in feedback_text
+    assert "<strong>BD</strong>" in feedback_text
+    assert "B. 2；D. 4" in feedback_text

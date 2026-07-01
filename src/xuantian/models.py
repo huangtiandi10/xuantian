@@ -55,6 +55,11 @@ class Question:
 
     def matches_answer(self, user_answer: str) -> bool:
         if self.type == "choice":
+            actual_letters = self.choice_answer_letters(user_answer)
+            expected_letters = self.choice_answer_letters(self.answer)
+            if expected_letters:
+                return actual_letters == expected_letters
+
             actual = self.normalize_choice_answer(user_answer)
             expected = self.normalize_choice_answer(self.answer)
             if actual == expected:
@@ -64,19 +69,32 @@ class Question:
             return False
         return user_answer.strip().lower() == self.answer.strip().lower()
 
+    def is_multiple_choice_answer(self) -> bool:
+        return len(self.choice_answer_letters(self.answer)) > 1
+
     def option_letters(self) -> list[str]:
         if not self.options:
             return []
         return [chr(65 + index) for index, _ in enumerate(self.options)]
 
-    def choice_index_for_answer(self, value: str) -> int | None:
+    def choice_answer_letters(self, value: str) -> list[str]:
+        if self.type != "choice" or not self.options:
+            return []
+
+        letters = self.option_letters()
+        compact_answer = re.sub(r"[\s,，、;；/|+&和及与.．)）(（-]+", "", value.strip().upper())
+        if compact_answer and all(letter in letters for letter in compact_answer):
+            return [letter for letter in letters if letter in set(compact_answer)]
+
+        option_index = self.choice_index_for_option_text(value)
+        if option_index is not None:
+            return [letters[option_index]]
+
+        return []
+
+    def choice_index_for_option_text(self, value: str) -> int | None:
         if self.type != "choice" or not self.options:
             return None
-
-        normalized = self.normalize_choice_answer(value)
-        letters = self.option_letters()
-        if normalized in letters:
-            return letters.index(normalized)
 
         raw_value = value.strip().lower()
         if not raw_value:
@@ -87,16 +105,29 @@ class Question:
                 return index
         return None
 
+    def choice_index_for_answer(self, value: str) -> int | None:
+        if self.type != "choice" or not self.options:
+            return None
+
+        selected_letters = self.choice_answer_letters(value)
+        if len(selected_letters) == 1:
+            return self.option_letters().index(selected_letters[0])
+        return None
+
     def display_answer(self, value: str) -> str:
         cleaned_value = value.strip()
         if self.type == "choice" and self.options:
-            choice_index = self.choice_index_for_answer(value)
-            if choice_index is not None:
-                letter = self.option_letters()[choice_index]
-                option = self.options[choice_index]
-                if re.match(rf"^{re.escape(letter)}\s*[.．、)]", option, flags=re.IGNORECASE):
-                    return option
-                return f"{letter}. {option}"
+            selected_letters = self.choice_answer_letters(value)
+            if selected_letters:
+                display_parts = []
+                for letter in selected_letters:
+                    choice_index = self.option_letters().index(letter)
+                    option = self.options[choice_index]
+                    if re.match(rf"^{re.escape(letter)}\s*[.．、)]", option, flags=re.IGNORECASE):
+                        display_parts.append(option)
+                    else:
+                        display_parts.append(f"{letter}. {option}")
+                return "；".join(display_parts)
         return cleaned_value
 
     def to_dict(self) -> dict[str, Any]:

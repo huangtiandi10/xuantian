@@ -47,16 +47,35 @@
       <h2>{{ question.prompt }}</h2>
       <form method="post" action="{{ url_for('submit_answer', session_id=session_row['id']) }}" class="stack-form">
         {% if question.type == "choice" %}
-          <div class="choice-grid">
-            {% for option in question.options %}
-              <button class="choice-button" type="submit" name="answer" value="{{ question.option_letters()[loop.index0] }}" {% if answered_current %}disabled{% endif %}>
-                <span class="choice-letter">{{ question.option_letters()[loop.index0] }}</span>
-                <span class="choice-copy">
-                  <strong>{{ option }}</strong>
-                </span>
-              </button>
-            {% endfor %}
-          </div>
+          {% set is_multiple_choice = question.is_multiple_choice_answer() %}
+          {% if is_multiple_choice and not answered_current %}
+            <p class="muted-line">这道题有多个正确选项，请选择全部答案后再提交。</p>
+          {% endif %}
+          {% if is_multiple_choice %}
+            <div class="choice-grid">
+              {% for option in question.options %}
+                <label class="choice-button choice-check-button">
+                  <input class="choice-input" type="checkbox" name="answer" value="{{ question.option_letters()[loop.index0] }}" {% if answered_current %}disabled{% endif %}>
+                  <span class="choice-letter">{{ question.option_letters()[loop.index0] }}</span>
+                  <span class="choice-copy">
+                    <strong>{{ option }}</strong>
+                  </span>
+                </label>
+              {% endfor %}
+            </div>
+            <button class="primary-button" type="submit" {% if answered_current %}disabled{% endif %}>提交答案</button>
+          {% else %}
+            <div class="choice-grid">
+              {% for option in question.options %}
+                <button class="choice-button" type="submit" name="answer" value="{{ question.option_letters()[loop.index0] }}" {% if answered_current %}disabled{% endif %}>
+                  <span class="choice-letter">{{ question.option_letters()[loop.index0] }}</span>
+                  <span class="choice-copy">
+                    <strong>{{ option }}</strong>
+                  </span>
+                </button>
+              {% endfor %}
+            </div>
+          {% endif %}
         {% else %}
           <label>
             <span>填写答案</span>

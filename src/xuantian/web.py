@@ -349,7 +349,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             return redirect(url_for("practice_summary", session_id=session_id))
 
         if question.type == "choice":
-            user_answer = request.form.get("answer", "").strip()
+            selected_answers = [answer.strip() for answer in request.form.getlist("answer") if answer.strip()]
+            user_answer = "".join(selected_answers)
         else:
             user_answer = request.form.get("blank_answer", "").strip()
 
