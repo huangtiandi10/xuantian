@@ -4,6 +4,7 @@ import io
 from pathlib import Path
 
 from xuantian.web import create_app
+from xuantian.models import Question
 
 
 def create_test_client(tmp_path: Path):
@@ -132,3 +133,16 @@ def test_can_go_back_to_previous_feedback_and_jump_to_question(tmp_path: Path):
     jumped_question_text = jumped_question.get_data(as_text=True)
     assert "第 3 / 3 题" in jumped_question_text
     assert "2+2=?" in jumped_question_text
+
+
+def test_choice_answer_display_does_not_duplicate_existing_option_prefix():
+    question = Question(
+        id="q",
+        type="choice",
+        prompt="IP?",
+        options=["A.29.9.255.15", "B.127.21.19.109"],
+        answer="B",
+        explanation="demo",
+    )
+
+    assert question.display_answer("B") == "B.127.21.19.109"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any
 
 
@@ -91,7 +92,11 @@ class Question:
         if self.type == "choice" and self.options:
             choice_index = self.choice_index_for_answer(value)
             if choice_index is not None:
-                return f"{self.option_letters()[choice_index]}. {self.options[choice_index]}"
+                letter = self.option_letters()[choice_index]
+                option = self.options[choice_index]
+                if re.match(rf"^{re.escape(letter)}\s*[.．、)]", option, flags=re.IGNORECASE):
+                    return option
+                return f"{letter}. {option}"
         return cleaned_value
 
     def to_dict(self) -> dict[str, Any]:
