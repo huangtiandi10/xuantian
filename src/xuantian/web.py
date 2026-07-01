@@ -19,10 +19,12 @@ from .repository import (
     create_user,
     current_question_from_session,
     feedback_payload,
+    feedback_for_index,
     filter_bank_questions,
     get_active_session_for_mode,
     get_active_sessions_for_bank,
     get_bank_for_user,
+    is_answered_index,
     get_session_for_user,
     get_user_by_id,
     import_bank_from_path,
@@ -30,8 +32,10 @@ from .repository import (
     init_db,
     list_banks_for_user,
     load_bank_from_row,
+    parse_question_order,
     record_answer,
     refresh_bank_from_source,
+    set_session_position,
     wrong_question_ids_for_bank,
     wrong_book_by_bank,
 )
@@ -287,17 +291,17 @@ def create_app(test_config: dict | None = None) -> Flask:
             return redirect(url_for("dashboard"))
         if int(session_row["needs_ack"]) == 1:
             return redirect(url_for("practice_feedback", session_id=session_id))
-        if session_row["status"] == "finished":
-            return redirect(url_for("practice_summary", session_id=session_id))
 
         bank_row = get_bank_for_user(db_path, int(g.user["id"]), int(session_row["bank_id"]))
         bank = load_bank_from_row(bank_row)
+        question_order = parse_question_order(session_row)
+        total_questions = len(question_order)
+        current_index = int(session_row["current_index"])
+        if current_index < 0 or current_index >= total_questions:
+            return redirect(url_for("practice_summary", session_id=session_id))
         question = current_question_from_session(session_row, bank)
         if question is None:
             return redirect(url_for("practice_summary", session_id=session_id))
-
-        question_order = session_row["question_order_json"]
-        total_questions = len(json.loads(question_order))
         history_item = None
         if session_row["source_kind"] == "wrong_book":
             history_item = next(
@@ -319,9 +323,12 @@ def create_app(test_config: dict | None = None) -> Flask:
             "practice_question.html",
             session_row=session_row,
             question=question,
-            current_number=int(session_row["current_index"]) + 1,
+            current_number=current_index + 1,
             total_questions=total_questions,
             question_history=question_history,
+            prev_question_number=current_index if current_index > 0 else None,
+            next_question_number=(current_index + 2) if current_index + 1 < total_questions else None,
+            answered_current=is_answered_index(session_row, current_index),
         )
 
     @app.post("/sessions/<int:session_id>/answer")
@@ -364,11 +371,16 @@ def create_app(test_config: dict | None = None) -> Flask:
         payload = feedback_payload(session_row)
         if not payload:
             return redirect(url_for("practice_session", session_id=session_id))
+        question_order = parse_question_order(session_row)
+        current_index = int(session_row["current_index"])
+        total_questions = len(question_order)
 
         return render_template(
             "practice_feedback.html",
             session_row=session_row,
             feedback=payload,
+            prev_question_number=current_index if current_index > 0 else None,
+            next_question_number=(current_index + 2) if current_index + 1 < total_questions else None,
         )
 
     @app.post("/sessions/<int:session_id>/next")
@@ -380,8 +392,71 @@ def create_app(test_config: dict | None = None) -> Flask:
             flash("练习记录不存在。", "error")
             return redirect(url_for("dashboard"))
         clear_feedback_ack(db_path, int(g.user["id"]), session_id)
-        if session_row["status"] == "finished":
+        question_order = parse_question_order(session_row)
+        current_index = int(session_row["current_index"])
+        next_index = current_index + 1
+        if next_index >= len(question_order):
             return redirect(url_for("practice_summary", session_id=session_id))
+        set_session_position(db_path, int(g.user["id"]), session_id, next_index)
+        return redirect(url_for("practice_session", session_id=session_id))
+
+    @app.post("/sessions/<int:session_id>/previous")
+    @login_required
+    def practice_previous(session_id: int):
+        db_path = Path(app.config["DATABASE_PATH"])
+        session_row = get_session_for_user(db_path, int(g.user["id"]), session_id)
+        if not session_row:
+            flash("练习记录不存在。", "error")
+            return redirect(url_for("dashboard"))
+        current_index = int(session_row["current_index"])
+        if current_index <= 0:
+            return redirect(url_for("practice_session", session_id=session_id))
+        set_session_position(
+            db_path,
+            int(g.user["id"]),
+            session_id,
+            current_index - 1,
+            clear_ack=int(session_row["needs_ack"]) == 1,
+        )
+        if int(session_row["needs_ack"]) == 1:
+            return redirect(url_for("practice_feedback", session_id=session_id))
+        return redirect(url_for("practice_session", session_id=session_id))
+
+    @app.post("/sessions/<int:session_id>/jump")
+    @login_required
+    def practice_jump(session_id: int):
+        db_path = Path(app.config["DATABASE_PATH"])
+        session_row = get_session_for_user(db_path, int(g.user["id"]), session_id)
+        if not session_row:
+            flash("练习记录不存在。", "error")
+            return redirect(url_for("dashboard"))
+
+        question_order = parse_question_order(session_row)
+        total_questions = len(question_order)
+        raw_target = request.form.get("question_number", "").strip()
+        if not raw_target.isdigit():
+            flash("请输入有效的题号。", "error")
+            return redirect(
+                url_for("practice_feedback" if int(session_row["needs_ack"]) == 1 else "practice_session", session_id=session_id)
+            )
+
+        target_number = int(raw_target)
+        if target_number < 1 or target_number > total_questions:
+            flash(f"题号需要在 1 到 {total_questions} 之间。", "error")
+            return redirect(
+                url_for("practice_feedback" if int(session_row["needs_ack"]) == 1 else "practice_session", session_id=session_id)
+            )
+
+        target_index = target_number - 1
+        set_session_position(
+            db_path,
+            int(g.user["id"]),
+            session_id,
+            target_index,
+            clear_ack=int(session_row["needs_ack"]) == 1,
+        )
+        if is_answered_index(session_row, target_index):
+            return redirect(url_for("practice_feedback", session_id=session_id))
         return redirect(url_for("practice_session", session_id=session_id))
 
     @app.get("/sessions/<int:session_id>/summary")

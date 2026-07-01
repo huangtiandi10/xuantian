@@ -8,7 +8,13 @@
       <div>
         <p class="eyebrow">{{ session_row["bank_title"] }}</p>
         <h1>第 {{ current_number }} / {{ total_questions }} 题</h1>
-        <p class="muted-line">跟着节奏往下做，提交后会立即看到答案讲解和结果反馈。</p>
+        <p class="muted-line">
+          {% if answered_current %}
+            这道题已经作答过了，可以回看讲解，也可以跳去别的题号继续。
+          {% else %}
+            跟着节奏往下做，提交后会立即看到答案讲解和结果反馈。
+          {% endif %}
+        </p>
       </div>
       <div class="top-meta-stack">
         <span class="tag">{{ question_type_labels[question.type] }}</span>
@@ -17,13 +23,33 @@
       </div>
     </div>
 
+    <div class="practice-toolbar">
+      <div class="inline-actions">
+        {% if prev_question_number %}
+          <form method="post" action="{{ url_for('practice_previous', session_id=session_row['id']) }}">
+            <button class="ghost-button" type="submit">上一题</button>
+          </form>
+        {% endif %}
+        {% if answered_current %}
+          <a class="ghost-button link-button" href="{{ url_for('practice_feedback', session_id=session_row['id']) }}">查看本题讲解</a>
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('practice_jump', session_id=session_row['id']) }}" class="jump-form">
+        <label>
+          <span>跳到题号</span>
+          <input type="text" name="question_number" inputmode="numeric" pattern="[0-9]*" placeholder="例如 12">
+        </label>
+        <button class="ghost-button" type="submit">跳转</button>
+      </form>
+    </div>
+
     <div class="question-block">
       <h2>{{ question.prompt }}</h2>
       <form method="post" action="{{ url_for('submit_answer', session_id=session_row['id']) }}" class="stack-form">
         {% if question.type == "choice" %}
           <div class="choice-grid">
             {% for option in question.options %}
-              <button class="choice-button" type="submit" name="answer" value="{{ question.option_letters()[loop.index0] }}">
+              <button class="choice-button" type="submit" name="answer" value="{{ question.option_letters()[loop.index0] }}" {% if answered_current %}disabled{% endif %}>
                 <span class="choice-letter">{{ question.option_letters()[loop.index0] }}</span>
                 <span class="choice-copy">
                   <strong>{{ option }}</strong>
@@ -34,9 +60,9 @@
         {% else %}
           <label>
             <span>填写答案</span>
-            <input type="text" name="blank_answer" placeholder="在这里输入你的答案" autocomplete="off" required>
+            <input type="text" name="blank_answer" placeholder="在这里输入你的答案" autocomplete="off" {% if answered_current %}disabled{% else %}required{% endif %}>
           </label>
-          <button class="primary-button" type="submit">提交答案</button>
+          <button class="primary-button" type="submit" {% if answered_current %}disabled{% endif %}>提交答案</button>
         {% endif %}
       </form>
     </div>

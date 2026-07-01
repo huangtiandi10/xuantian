@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS practice_sessions (
     current_index INTEGER NOT NULL DEFAULT 0,
     answered_count INTEGER NOT NULL DEFAULT 0,
     correct_count INTEGER NOT NULL DEFAULT 0,
+    answers_json TEXT NOT NULL DEFAULT '[]',
     status TEXT NOT NULL DEFAULT 'active',
     needs_ack INTEGER NOT NULL DEFAULT 0,
     last_feedback_json TEXT,
@@ -110,6 +111,7 @@ def init_db(db_path: Path) -> None:
         connection.executescript(SCHEMA)
         ensure_column(connection, "practice_sessions", "order_mode", "TEXT NOT NULL DEFAULT 'shuffle'")
         ensure_column(connection, "practice_sessions", "source_kind", "TEXT NOT NULL DEFAULT 'bank'")
+        ensure_column(connection, "practice_sessions", "answers_json", "TEXT NOT NULL DEFAULT '[]'")
         ensure_column(connection, "wrong_questions", "correct_streak", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(connection, "wrong_questions", "answer_history_json", "TEXT NOT NULL DEFAULT '[]'")
         connection.commit()
@@ -388,11 +390,21 @@ def create_session(
         connection.execute(
             """
             INSERT INTO practice_sessions (
-                user_id, bank_id, mode, order_mode, source_kind, question_order_json, created_at, updated_at
+                user_id, bank_id, mode, order_mode, source_kind, question_order_json, answers_json, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, bank_id, mode, order_mode, source_kind, json.dumps(question_ids), now, now),
+            (
+                user_id,
+                bank_id,
+                mode,
+                order_mode,
+                source_kind,
+                json.dumps(question_ids),
+                json.dumps([None] * len(question_ids), ensure_ascii=False),
+                now,
+                now,
+            ),
         )
         session_id = int(connection.execute("SELECT last_insert_rowid()").fetchone()[0])
         connection.commit()
@@ -436,6 +448,49 @@ def parse_question_order(session_row: sqlite3.Row) -> list[str]:
     return json.loads(session_row["question_order_json"])
 
 
+def parse_answer_records(session_row: sqlite3.Row) -> list[dict[str, Any] | None]:
+    question_order = parse_question_order(session_row)
+    total_questions = len(question_order)
+    raw = session_row["answers_json"] if "answers_json" in set(session_row.keys()) else None
+    try:
+        parsed = json.loads(raw) if raw else []
+    except json.JSONDecodeError:
+        parsed = []
+
+    if not isinstance(parsed, list):
+        parsed = []
+
+    records: list[dict[str, Any] | None] = []
+    for item in parsed[:total_questions]:
+        records.append(item if isinstance(item, dict) else None)
+    if len(records) < total_questions:
+        records.extend([None] * (total_questions - len(records)))
+
+    # Allow old active sessions to at least recover the latest feedback after upgrade.
+    if not any(record is not None for record in records) and session_row["last_feedback_json"]:
+        try:
+            latest_feedback = json.loads(session_row["last_feedback_json"])
+        except json.JSONDecodeError:
+            latest_feedback = None
+        if isinstance(latest_feedback, dict):
+            question_id = latest_feedback.get("question_id")
+            if question_id in question_order:
+                records[question_order.index(question_id)] = latest_feedback
+
+    return records
+
+
+def feedback_for_index(session_row: sqlite3.Row, index: int) -> dict[str, Any] | None:
+    records = parse_answer_records(session_row)
+    if index < 0 or index >= len(records):
+        return None
+    return records[index]
+
+
+def is_answered_index(session_row: sqlite3.Row, index: int) -> bool:
+    return feedback_for_index(session_row, index) is not None
+
+
 def current_question_from_session(session_row: sqlite3.Row, bank: QuestionBank) -> Question | None:
     question_order = parse_question_order(session_row)
     current_index = int(session_row["current_index"])
@@ -445,6 +500,11 @@ def current_question_from_session(session_row: sqlite3.Row, bank: QuestionBank) 
 
 
 def feedback_payload(session_row: sqlite3.Row) -> dict[str, Any] | None:
+    payload = feedback_for_index(session_row, int(session_row["current_index"]))
+    if payload:
+        return payload
+    if int(session_row["needs_ack"]) == 0:
+        return None
     raw = session_row["last_feedback_json"]
     if not raw:
         return None
@@ -459,11 +519,16 @@ def record_answer(
 ) -> None:
     question_order = parse_question_order(session_row)
     current_index = int(session_row["current_index"])
+    answer_records = parse_answer_records(session_row)
+    if current_index < 0 or current_index >= len(question_order):
+        return
+    if answer_records[current_index] is not None:
+        return
+
     answered_count = int(session_row["answered_count"]) + 1
     is_correct = question.matches_answer(user_answer)
     correct_count = int(session_row["correct_count"]) + (1 if is_correct else 0)
-    next_index = current_index + 1
-    finished = next_index >= len(question_order)
+    finished = answered_count >= len(question_order)
     now = utc_now()
     feedback = {
         "question_id": question.id,
@@ -476,7 +541,7 @@ def record_answer(
         "correct_answer_display": question.display_answer(question.answer),
         "explanation": question.explanation,
         "is_correct": is_correct,
-        "question_number": answered_count,
+        "question_number": current_index + 1,
         "total_questions": len(question_order),
     }
 
@@ -499,18 +564,21 @@ def record_answer(
             user_answer=user_answer,
         )
 
+    answer_records[current_index] = feedback
+
     with get_connection(db_path) as connection:
         connection.execute(
             """
             UPDATE practice_sessions
             SET current_index = ?, answered_count = ?, correct_count = ?,
-                status = ?, needs_ack = 1, last_feedback_json = ?, updated_at = ?
+                answers_json = ?, status = ?, needs_ack = 1, last_feedback_json = ?, updated_at = ?
             WHERE id = ? AND user_id = ?
             """,
             (
-                next_index,
+                current_index,
                 answered_count,
                 correct_count,
+                json.dumps(answer_records, ensure_ascii=False),
                 "finished" if finished else "active",
                 json.dumps(feedback, ensure_ascii=False),
                 now,
@@ -532,6 +600,37 @@ def clear_feedback_ack(db_path: Path, user_id: int, session_id: int) -> None:
             """,
             (now, session_id, user_id),
         )
+        connection.commit()
+
+
+def set_session_position(
+    db_path: Path,
+    user_id: int,
+    session_id: int,
+    target_index: int,
+    *,
+    clear_ack: bool = False,
+) -> None:
+    now = utc_now()
+    with get_connection(db_path) as connection:
+        if clear_ack:
+            connection.execute(
+                """
+                UPDATE practice_sessions
+                SET current_index = ?, needs_ack = 0, updated_at = ?
+                WHERE id = ? AND user_id = ?
+                """,
+                (target_index, now, session_id, user_id),
+            )
+        else:
+            connection.execute(
+                """
+                UPDATE practice_sessions
+                SET current_index = ?, updated_at = ?
+                WHERE id = ? AND user_id = ?
+                """,
+                (target_index, now, session_id, user_id),
+            )
         connection.commit()
 
 

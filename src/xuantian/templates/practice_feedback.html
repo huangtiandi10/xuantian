@@ -28,6 +28,28 @@
         {% endif %}
       </div>
 
+      <div class="practice-toolbar">
+        <div class="inline-actions">
+          {% if prev_question_number %}
+            <form method="post" action="{{ url_for('practice_previous', session_id=session_row['id']) }}">
+              <button class="ghost-button" type="submit">上一题</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('practice_next', session_id=session_row['id']) }}">
+            <button class="primary-button" type="submit">
+              {{ "查看本轮结果" if session_row["status"] == "finished" and not next_question_number else "下一题" }}
+            </button>
+          </form>
+        </div>
+        <form method="post" action="{{ url_for('practice_jump', session_id=session_row['id']) }}" class="jump-form">
+          <label>
+            <span>跳到题号</span>
+            <input type="text" name="question_number" inputmode="numeric" pattern="[0-9]*" placeholder="例如 12">
+          </label>
+          <button class="ghost-button" type="submit">跳转</button>
+        </form>
+      </div>
+
       <div class="answer-compare-grid">
         <article class="answer-card answer-card-user {{ 'answer-card-good' if feedback['is_correct'] else 'answer-card-bad' }}">
           <span class="answer-label">你的答案</span>
@@ -73,12 +95,6 @@
         <p>{{ feedback["explanation"] }}</p>
       </div>
     </div>
-
-    <form method="post" action="{{ url_for('practice_next', session_id=session_row['id']) }}">
-      <button class="primary-button" type="submit">
-        {{ "查看本轮结果" if session_row["status"] == "finished" else "下一题" }}
-      </button>
-    </form>
   </div>
 </section>
 {% endblock %}
